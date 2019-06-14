@@ -11,6 +11,9 @@
     <modules>
         <module>spring_1</module>
         <module>spring_2</module>
+        <module>spring_3</module>
+        <module>spring_4</module>
+        <module>spring_5</module>
     </modules>
 
     <name>MySpring</name>
