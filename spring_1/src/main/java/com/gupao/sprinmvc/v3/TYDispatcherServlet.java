@@ -223,7 +223,7 @@ public class TYDispatcherServlet extends HttpServlet {
 
     private void doScanner(String scanPackage) {
 
-        URL url = this.getClass().getClass().getResource("/"+scanPackage.replaceAll("\\.","/"));
+        URL url = this.getClass().getClassLoader().getResource("/"+scanPackage.replaceAll("\\.","/"));
 
         File classPath = new File(url.getFile());
 
