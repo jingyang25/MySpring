@@ -1,14 +1,19 @@
-package com.gupao.beans.config;
+package com.gupao.frame.beans.config;
 
 import lombok.Data;
 
+/**
+ * @author yangTan
+ * @date 2019/6/27
+ */
 @Data
-public class TBeanDefinition {
+public class YBeanDefinition {
 
     private String beanClassName;
 
     private String factoryBeanName;
 
-    //是否延迟加载
     private boolean lazyInit = false;
+
+
 }

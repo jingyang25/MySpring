@@ -1,17 +1,18 @@
 package com.gupao.demo.service.impl;
 
+import com.gupao.demo.service.IQueryService;
+import com.gupao.frame.annotation.YService;
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
-
-import com.gupao.annotation.TService;
-import com.gupao.demo.service.IQueryService;
 
 /**
  * 查询业务
  * @author Tom
  *
  */
-@TService
+@YService
+
 public class QueryService implements IQueryService {
 
 	/**
@@ -21,7 +22,7 @@ public class QueryService implements IQueryService {
 		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 		String time = sdf.format(new Date());
 		String json = "{name:\"" + name + "\",time:\"" + time + "\"}";
-		System.out.println("这是在业务方法中打印的：" + json);
+		//log.info("这是在业务方法中打印的：" + json);
 		return json;
 	}
 

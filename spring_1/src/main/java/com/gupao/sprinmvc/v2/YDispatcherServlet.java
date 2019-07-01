@@ -2,7 +2,6 @@ package com.gupao.sprinmvc.v2;
 
 
 import com.gupao.sprinmvc.annotation.*;
-import org.omg.Messaging.SYNC_WITH_TRANSPORT;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -12,6 +11,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
@@ -334,5 +334,289 @@ public class YDispatcherServlet extends HttpServlet{
                 }
             }
         }
+    }
+
+    /**
+     * DispatcherServlet
+     *
+     * web.xml 入口
+     * init() 初始化
+     * 输入Url web容器调用 service()
+     * doGet() doPost() 执行逻辑
+     * destory() 销毁
+     */
+    public static class TDispatcherServlet extends HttpServlet {
+
+        //保存application.properties配置文件中的内容
+        private Properties contextConfig = new Properties();
+
+        //保存扫描的所有的类名
+
+        private List<String> classNames = new ArrayList<>();
+
+        //创建IOC容器
+        private Map<String,Object> ioc = new HashMap<>();
+
+        //创建处理器映射器 （保存Url 和Method的对应关系）
+        private Map <String,Method> handlerMapping= new HashMap<>();
+
+
+        @Override
+        protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+
+            this.doPost(req,resp);
+        }
+
+        @Override
+        protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+
+            try {
+                doDispatch(req,resp);
+            } catch (Exception e) {
+                e.printStackTrace();
+                resp.getWriter().write("500 error");
+            }
+
+        }
+
+
+        private void doDispatch(HttpServletRequest req, HttpServletResponse resp) throws IOException, InvocationTargetException, IllegalAccessException {
+
+            //获得绝对路径
+            String url = req.getRequestURI();
+            //处理成相对路径
+            String contextPath = req.getContextPath();
+
+            url = url.replaceAll(contextPath,"").replaceAll("/+","/");
+
+            if(!this.handlerMapping.containsKey(url)){
+                resp.getWriter().write("404 Not Found!!");
+                return;
+            }
+
+            Method method = this.handlerMapping.get(url);
+
+            //从 request中拿到url传过来的参数
+            Map<String,String[]> params = req.getParameterMap();
+
+            //获取方法的形参列表
+            Class<?> [] parameterTypes = method.getParameterTypes();
+
+            //形参的值
+
+            Object[] parameterValue = new Object[parameterTypes.length] ;
+
+
+            for(int i=0;i<parameterTypes.length;i++){
+                Class parameterType = parameterTypes[i];
+                //不能用 instance of parameterType 不是实参 而是形参
+                if(parameterType == HttpServletRequest.class){
+                    parameterValue[i] = req;
+                    continue;
+                }else if (parameterType == HttpServletResponse.class){
+                    parameterValue[i] = resp;
+                    continue;
+                }else if(parameterType==String.class){
+                    YRequestParam requestParam = (YRequestParam) parameterType.getAnnotation(YRequestParam.class);
+                    if (params.containsKey(requestParam.value())){
+                        for (Map.Entry<String,String[]> param:params.entrySet()){
+
+                            String value = Arrays.toString(param.getValue())
+                                    .replaceAll("\\[|\\]","")
+                                    .replaceAll("\\s",",");
+                            parameterValue[i] = value;
+                        }
+                    }
+                }
+            }
+
+            String beanName = toLowerFirstCase(method.getDeclaringClass().getSimpleName()) ;
+
+            method.invoke(ioc.get(beanName),parameterValue);
+        }
+
+        //初始化
+        public void init(ServletConfig config){
+
+            //加载配置文件
+            doLoadConfig(config.getInitParameter("contextConfigLocation"));
+
+            //扫描相关的类
+            doScanner(contextConfig.getProperty("scanPackage"));
+
+            //创建实例并保存至容器
+            doInstance();
+
+            //DI 依赖注入
+            doAutowired();
+
+            //初始化 HandlerMapping
+
+            initHandlerMapping();
+
+
+        }
+
+        //————————————————初始化 开始
+        private void doLoadConfig(String contextConfigLocation) {
+            //直接从类路径下找到Spring主配置文件所在的路径 并且将其读取出来放到Properties 对象中
+            //相对于 scanPackage= com.gupao.demo 从文件中保存到了内存中
+            InputStream fis = this.getClass().getClassLoader().getResourceAsStream(contextConfigLocation);
+
+            try {
+                contextConfig.load(fis);
+            } catch (IOException e) {
+                e.printStackTrace();
+
+            }finally {
+                try {
+                    fis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+
+        }
+
+        /**
+         * 扫描相关的类
+         */
+        private void doScanner(String scanPackage) {
+            URL url = this.getClass().getClassLoader().getResource("/"+scanPackage.replace("\\.","/"));
+            File classPath = new File(url.getFile());
+            for (File file:classPath.listFiles()) {
+                if (file.isDirectory()){
+                    doScanner(scanPackage+"."+file.getName());
+                }else {
+                    if (!file.getName().endsWith(".class")){continue;}
+                    String className = scanPackage+"."+file.getName().replace(".class","");
+                    classNames.add(className);
+                }
+            }
+
+        }
+
+        //实例化
+        private void doInstance() {
+         // 将ClassNames 中的根据类名实例化
+            /**
+             * 什么样的类才需要初始化呢
+             * 加了注解的类 才需要初始化
+             *
+             */
+            for (String className:classNames) {
+
+                try {
+                    Class<?> clazz = Class.forName(className);
+                    if (clazz.isAnnotationPresent(YController.class)){
+                        Object instance = clazz.newInstance();
+                        //spring 默认类名首字母小写
+                        String beanName = toLowerFirstCase(clazz.getSimpleName());
+                        ioc.put(beanName,instance);
+                    }else if (clazz.isAnnotationPresent(YService.class)){
+                        YService service = clazz.getAnnotation(YService.class);
+                        String beanName = service.value();
+
+                        if ("".equals(beanName.trim())){
+                            beanName = toLowerFirstCase(clazz.getSimpleName());
+                        }
+                        Object instance = clazz.newInstance();
+
+                        ioc.put(beanName,instance);
+
+                        //如果类是接口
+                        for (Class<?> i:clazz.getInterfaces()) {
+
+                            if (ioc.containsKey(i.getName())){
+                                throw  new Exception("The "+i.getName()+"is exists!!");
+                            }
+
+                            ioc.put(i.getName(),instance);
+
+                        }
+                    }else{
+                        continue;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+
+            }
+        }
+
+
+        private String toLowerFirstCase(String simpleName) {
+            char[] chars = simpleName.toCharArray();
+
+            chars[0]+= 32;
+            return String.valueOf(chars);
+
+        }
+
+        //什么样的类才需要依赖注入-加了注解的bean
+        // 怎样注入
+        private void doAutowired() {
+            if(ioc.isEmpty()) return;
+            for (Map.Entry<String,Object> entry:ioc.entrySet()) {
+
+                Field[]  fields = entry.getValue().getClass().getDeclaredFields();
+                for (Field field:fields) {
+                    if (!field.isAnnotationPresent(YAutowired.class)) continue;
+                    YAutowired autowired = field.getAnnotation(YAutowired.class);
+
+                    String beanName = autowired.value().trim();
+                    if ("".equals(beanName)){
+                        //获得接口的类型 作为 key 值待会会拿这个Key 到容器中去取值
+                        beanName = field.getType().getName();
+                    }
+
+                    field.setAccessible(true);
+
+                    //用反射机制 动态给字段赋值
+                    try {
+                        field.set(entry.getValue(),ioc.get(beanName));
+                    } catch (IllegalAccessException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        private void initHandlerMapping() {
+         if (ioc.isEmpty()) return;
+            for (Map.Entry<String,Object> entry:ioc.entrySet()){
+                Class<?> clazz = entry.getValue().getClass();
+                if (!clazz.isAnnotationPresent(YController.class)) continue;
+
+                //保存 写在类上面的@GPRequestMapping("/demo")
+                String baseUrl = "";
+
+                if (clazz.isAnnotationPresent(YRequestMapping.class)){
+                    YRequestMapping requestMapping = clazz.getAnnotation(YRequestMapping.class);
+                    baseUrl = requestMapping.value();
+                }
+
+                //获取所有的Method 的public 方法
+
+                for (Method method:clazz.getMethods()) {
+                    if(!method.isAnnotationPresent(YRequestMapping.class)) continue;
+
+                    YRequestMapping requestMapping = method.getAnnotation(YRequestMapping.class);
+                    //优化 // demo //// query
+                    String url = ("/"+baseUrl+"/"+requestMapping.value()).replaceAll("/+","/");
+                    handlerMapping.put(url,method);
+                    System.out.println("Mapped:"+url +","+method);
+                }
+            }
+
+        }
+
+        // ————————————————初始化结束
+
+
+
+
     }
 }

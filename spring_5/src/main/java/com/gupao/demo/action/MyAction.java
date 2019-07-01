@@ -1,55 +1,56 @@
 package com.gupao.demo.action;
 
-import java.io.IOException;
+import com.gupao.demo.service.IModifyService;
+import com.gupao.demo.service.IQueryService;
+import com.gupao.frame.annotation.YAutowired;
+import com.gupao.frame.annotation.YController;
+import com.gupao.frame.annotation.YRequestMapping;
+import com.gupao.frame.annotation.YRequestParam;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
-import com.gupao.annotation.TAutowired;
-import com.gupao.annotation.TController;
-import com.gupao.annotation.TRequestMapping;
-import com.gupao.annotation.TRequestParam;
-import com.gupao.demo.service.IModifyService;
-import com.gupao.demo.service.IQueryService;
 
 /**
  * 公布接口url
  * @author Tom
  *
  */
-@TController(value = "myAction")
-@TRequestMapping("/web")
+@YController
+@YRequestMapping("/web")
 public class MyAction {
 
-	@TAutowired
+	@YAutowired
     IQueryService queryService;
-	@TAutowired IModifyService modifyService;
+	@YAutowired
+    IModifyService modifyService;
 
-	@TRequestMapping("/query.json")
+	@YRequestMapping("/query.json")
 	public void query(HttpServletRequest request, HttpServletResponse response,
-								@TRequestParam("name") String name){
+								@YRequestParam("name") String name){
 		String result = queryService.query(name);
 		out(response,result);
 	}
 	
-	@TRequestMapping("/add*.json")
-	public void add(HttpServletRequest request,HttpServletResponse response,
-			   @TRequestParam("name") String name,@TRequestParam("addr") String addr){
+	@YRequestMapping("/add*.json")
+	public void add(HttpServletRequest request, HttpServletResponse response,
+                    @YRequestParam("name") String name, @YRequestParam("addr") String addr){
 		String result = modifyService.add(name,addr);
 		out(response,result);
 	}
 	
-	@TRequestMapping("/remove.json")
+	@YRequestMapping("/remove.json")
 	public void remove(HttpServletRequest request,HttpServletResponse response,
-		   @TRequestParam("id") Integer id){
+		   @YRequestParam("id") Integer id){
 		String result = modifyService.remove(id);
 		out(response,result);
 	}
 	
-	@TRequestMapping("/edit.json")
+	@YRequestMapping("/edit.json")
 	public void edit(HttpServletRequest request,HttpServletResponse response,
-			@TRequestParam("id") Integer id,
-			@TRequestParam("name") String name){
+			@YRequestParam("id") Integer id,
+			@YRequestParam("name") String name){
 		String result = modifyService.edit(id,name);
 		out(response,result);
 	}

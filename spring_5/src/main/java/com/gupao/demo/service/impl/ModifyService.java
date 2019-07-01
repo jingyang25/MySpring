@@ -1,13 +1,15 @@
 package com.gupao.demo.service.impl;
 
-import com.gupao.annotation.TService;
+
 import com.gupao.demo.service.IModifyService;
+import com.gupao.frame.annotation.YService;
+
 /**
  * 增删改业务
  * @author Tom
  *
  */
-@TService
+@YService
 public class ModifyService implements IModifyService {
 
 	/**
